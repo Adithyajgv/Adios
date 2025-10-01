@@ -14,20 +14,22 @@ size_t row = 0;
 uint8_t color = PRINT_COLOR_WHITE | PRINT_COLOR_BLACK << 4;
 
 void clear_row(size_t row) {
-    struct Char empty = (struct Char) {
-        character: ' ',
-        color: color,
-    };
+    struct Char empty;
+    empty.character = ' ';
+    empty.color = color;
 
     for (size_t col = 0; col < NUM_COLS; col++) {
         buffer[col + NUM_COLS * row] = empty;
     }
+    row = 0;
 }
 
 void print_clear() {
     for (size_t i = 0; i < NUM_ROWS; i++) {
         clear_row(i);
     }
+    col = 0;
+    row = 0;
 }
 
 void print_newline() {
@@ -64,6 +66,24 @@ void print_char(char character) {
     };
 
     col++;
+}
+
+void backspace() {
+    if (col == 0 && row == 0) {
+        return;
+    }
+
+    if (col == 0) {
+        row--;
+        col = NUM_COLS - 1;
+    } else {
+        col--;
+    }
+
+    buffer[col + NUM_COLS * row] = (struct Char) {
+        character: ' ',
+        color: color,
+    };
 }
 
 void print_str(char* str) {
