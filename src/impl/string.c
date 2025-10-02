@@ -29,3 +29,29 @@ void* memset(void* dest, int val, size_t len) {
     }
     return dest;
 }
+
+char* strcpy(char* dest, const char* src) {
+    char* ptr = dest;
+    while (*src) {
+        *ptr++ = *src++;
+    }
+    *ptr = '\0';
+    return dest;
+}
+
+void* memcpy(void* dest, const void* src, size_t n) {
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
+    for (size_t i = 0; i < n; i++) {
+        d[i] = s[i];
+    }
+    return dest;
+}
+
+char* strchr(const char* s, int c) {
+    while (*s) {
+        if (*s == (char)c) return (char*)s;
+        s++;
+    }
+    return NULL;
+}

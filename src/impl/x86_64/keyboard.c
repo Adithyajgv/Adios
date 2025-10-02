@@ -1,45 +1,60 @@
 #include <stddef.h>
-#include "bool.h"
 #include "keyboard.h"
 #include "x86_64/idt.h"
 #include "x86_64/ps2.h"
 
 #define KEYBOARD_EXTENDED_SCAN_CODE 0xE0
 
+static bool shift_down = false;
+
 void (*keyboard_handler_user)(struct KeyboardEvent event);
 
 void keyboard_handler() {
-	static bool is_extended = 0;
-	
-	uint8_t scan_code = ps2_read_scan_code();
-	
-	if (scan_code == KEYBOARD_EXTENDED_SCAN_CODE) {
-		is_extended = true;
-		return;
-	}
-	
-	if (keyboard_handler_user == NULL) {
-		return;
-	}
-	
-	uint16_t fat_code = scan_code & 0x7F;
-	
-	if (is_extended) {
-		is_extended = false;
-		fat_code |= KEYBOARD_EXTENDED_SCAN_CODE << 8;
-	}
-	
-	struct KeyboardEvent event;
-	
-	if ((scan_code & 0x80) == 0) {
-		event.type = KEYBOARD_EVENT_TYPE_MAKE;
-	} else {
-		event.type = KEYBOARD_EVENT_TYPE_BREAK;
-	}
-	
-	event.code = fat_code;
-	
-	keyboard_handler_user(event);
+    static bool is_extended = 0;
+    
+    uint8_t scan_code = ps2_read_scan_code();
+    
+    if (scan_code == KEYBOARD_EXTENDED_SCAN_CODE) {
+        is_extended = true;
+        return;
+    }
+    
+    if (keyboard_handler_user == NULL) {
+        return;
+    }
+    
+    uint16_t fat_code = scan_code & 0x7F;
+    
+    if (is_extended) {
+        is_extended = false;
+        fat_code |= KEYBOARD_EXTENDED_SCAN_CODE << 8;
+    }
+    
+    struct KeyboardEvent event;
+    
+    if ((scan_code & 0x80) == 0) {  // Make code
+        event.type = KEYBOARD_EVENT_TYPE_MAKE;
+    } else {
+        event.type = KEYBOARD_EVENT_TYPE_BREAK;
+    }
+    
+    event.code = fat_code;
+
+    // Track shift state on left and right shift keys
+    if (fat_code == 0x2A /* Left Shift */ || fat_code == 0x36 /* Right Shift */) {
+        if (event.type == KEYBOARD_EVENT_TYPE_MAKE) {
+            shift_down = true;
+        } else if (event.type == KEYBOARD_EVENT_TYPE_BREAK) {
+            shift_down = false;
+        }
+        return;
+    }
+
+    keyboard_handler_user(event);
+}
+
+bool keyboard_is_shift_down() {
+    return shift_down;
 }
 
 void keyboard_init() {

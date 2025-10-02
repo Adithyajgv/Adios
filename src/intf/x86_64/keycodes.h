@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include "bool.h"
 
 #define KEY_CODE_A 0x1E
 #define KEY_CODE_B 0x30
@@ -41,4 +42,4 @@
 #define KEY_CODE_RIGHTBRACKET 0x1B // ']'
 #define KEY_CODE_BACKSPACE 0x0E
 
-char to_ascii(uint16_t code);
+char to_ascii(uint16_t code, bool shift);

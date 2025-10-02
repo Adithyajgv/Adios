@@ -3,11 +3,6 @@
 const static size_t NUM_COLS = 80;
 const static size_t NUM_ROWS = 25;
 
-struct Char {
-    uint8_t character;
-    uint8_t color;
-};
-
 struct Char* buffer = (struct Char*) 0xb8000;
 size_t col = 0;
 size_t row = 0;
@@ -86,7 +81,7 @@ void backspace() {
     };
 }
 
-void print_str(char* str) {
+void print_str(const char* str) {
     for (size_t i = 0; 1; i++) {
         char character = (uint8_t) str[i];
 

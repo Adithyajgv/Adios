@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "bool.h"
 
 enum {
 	KEYBOARD_EVENT_TYPE_MAKE = 0,
@@ -14,3 +15,4 @@ struct KeyboardEvent {
 
 void keyboard_init();
 void keyboard_set_handler(void (*handler)(struct KeyboardEvent event));
+bool keyboard_is_shift_down();
