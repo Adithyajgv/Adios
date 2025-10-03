@@ -15,6 +15,13 @@ x86_64_object_files := $(x86_64_c_object_files) $(x86_64_asm_object_files)
 common_c_source_files := $(shell find src/impl -maxdepth 1 -name '*.c')
 common_object_files := $(patsubst src/impl/%.c, build/%.o, $(common_c_source_files))
 
+fatfs_source_files := $(wildcard third_party/fatfs/*.c)
+fatfs_object_files := $(patsubst third_party/fatfs/%.c, build/fatfs/%.o, $(fatfs_source_files))
+
+
+run: build-x86_64
+	@echo -n ""
+
 build/kernel/%.o: src/impl/kernel/%.c
 	mkdir -p $(dir $@)
 	$(CC) -c -I src/intf -ffreestanding $(patsubst build/kernel/%.o, src/impl/kernel/%.c, $@) -o $@
@@ -31,10 +38,14 @@ build/%.o: src/impl/%.c
 	mkdir -p $(dir $@)
 	$(CC) -c -I src/intf -ffreestanding $< -o $@
 
+build/fatfs/%.o: include/fatfs/%.c
+	mkdir -p $(dir $@)
+	$(CC) -c -I include/fatfs -I src/intf -ffreestanding $< -o $@
+
 .PHONY: build-x86_64
-build-x86_64: $(kernel_object_files) $(x86_64_object_files) $(common_object_files)
+build-x86_64: $(kernel_object_files) $(x86_64_object_files) $(common_object_files) $(fatfs_object_files)
 	mkdir -p dist/x86_64
-	$(LD) -n -o dist/x86_64/kernel.bin -T targets/x86_64/linker.ld $(kernel_object_files) $(x86_64_object_files) $(common_object_files)
+	$(LD) -n -o dist/x86_64/kernel.bin -T targets/x86_64/linker.ld $(kernel_object_files) $(x86_64_object_files) $(common_object_files) $(fatfs_object_files)
 	cp dist/x86_64/kernel.bin targets/x86_64/iso/boot/kernel.bin
 	grub-mkrescue /usr/lib/grub/i386-pc -o dist/x86_64/kernel.iso targets/x86_64/iso
 

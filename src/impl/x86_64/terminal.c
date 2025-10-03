@@ -10,6 +10,7 @@
 #include <stddef.h>
 
 #define INPUT_BUFFER_SIZE 128
+#define VAR_EXPANSION_LIMIT 16
 
 static char* user = "Adi";
 static char* host = "AdiOS";
@@ -58,13 +59,23 @@ static void var_set(const char* name, const char* value) {
     vars_head = new_var;
 }
 
-static const char* var_get(const char* name) {
+static const char* var_get_depth(const char* name, int depth) {
+    if (depth > VAR_EXPANSION_LIMIT) return NULL;  // Prevent infinite recursion/cycles
     VarNode* cur = vars_head;
     while (cur) {
-        if (strcmp(cur->name, name) == 0) return cur->value;
+        if (strcmp(cur->name, name) == 0) {
+            // If the value is itself a variable reference, expand recursively
+            if (cur->value && cur->value[0] == '!')
+                return var_get_depth(cur->value + 1, depth + 1);
+            return cur->value;
+        }
         cur = cur->next;
     }
     return NULL;
+}
+
+static const char* var_get(const char* name) {
+    return var_get_depth(name, 0);
 }
 
 // Command function prototypes
@@ -130,7 +141,15 @@ static void handle_command(char* line) {
                 val[len-1] = '\0';
                 val++;
             }
-            var_set(varname, val);
+            if (val[0] == '!') {
+                const char* expanded = var_get(val + 1);
+                if (expanded)
+                    var_set(varname, expanded);
+                else
+                    var_set(varname, val);
+            } else {
+                var_set(varname, val);
+            }
         } else {
             print_str("\nInvalid variable declaration. Usage: !var=\"value\"\n");
         }
@@ -237,7 +256,7 @@ static void cmd_help(int argc, char** argv) {
 }
 
 void terminal_init(void) {
-    print_str("\nSimple OS Terminal\n");
+    print_str("\nAdiOS Terminal\n");
     // Build prompt header
     strcpy(header, user);
     strcat(header, "@");
