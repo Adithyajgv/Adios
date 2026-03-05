@@ -7,7 +7,7 @@
 void handle_input(struct KeyboardEvent event) {
     if (event.type == KEYBOARD_EVENT_TYPE_MAKE) {
         print_set_color(PRINT_COLOR_BLUE, PRINT_COLOR_WHITE);
-        print_char(to_ascii(event.code));
+        print_char(to_ascii(event.code, false));
     } else if (event.type == KEYBOARD_EVENT_TYPE_BREAK) {
     }
 }
