@@ -56,7 +56,7 @@
 /* This option switches f_forward(). (0:Disable or 1:Enable) */
 
 
-#define FF_USE_STRFUNC	0
+#define FF_USE_STRFUNC	1
 #define FF_PRINT_LLI	0
 #define FF_PRINT_FLOAT	0
 #define FF_STRF_ENCODE	0
@@ -178,7 +178,7 @@
 / Drive/Volume Configurations
 /---------------------------------------------------------------------------*/
 
-#define FF_VOLUMES		1
+#define FF_VOLUMES		2
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 

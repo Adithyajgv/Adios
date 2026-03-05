@@ -1,4 +1,15 @@
 /build/
-/dist/
+/build-bunutils/
+/build-gcc/
 /buildenv/
+/dist/
+/gcc/
+/binutils/
 /.vscode/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+*.DS_Store
+*.zip

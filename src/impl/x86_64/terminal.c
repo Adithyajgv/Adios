@@ -6,6 +6,11 @@
 #include "bool.h"
 #include "stdlib.h"
 #include "power.h"
+#include "vfs.h"
+#include "x86_64/ata.h"
+
+// FatFs for src command file reading
+#include "ff.h"
 
 #include <stddef.h>
 
@@ -78,27 +83,7 @@ static const char* var_get(const char* name) {
     return var_get_depth(name, 0);
 }
 
-// Command function prototypes
-static void cmd_echo(int argc, char** argv);
-static void cmd_clear(int argc, char** argv);
-static void cmd_info(int argc, char** argv);
-static void cmd_shutdown(int argc, char** argv);
-static void cmd_help(int argc, char** argv);
 
-// Command list
-typedef struct {
-    const char* name;
-    void (*func)(int argc, char** argv);
-} Command;
-
-static const Command commands[] = {
-    { "echo", cmd_echo },
-    { "clear", cmd_clear },
-    { "info", cmd_info },
-    { "help", cmd_help },
-    { "shutdown", cmd_shutdown },
-    { NULL, NULL }
-};
 
 // Input buffer
 static char input_buffer[INPUT_BUFFER_SIZE];
@@ -176,17 +161,151 @@ static void handle_command(char* line) {
     }
     if (argc == 0) return;
 
-    for (int i = 0; commands[i].name != NULL; i++) {
-        if (strcmp(argv[0], commands[i].name) == 0) {
-            commands[i].func(argc, argv);
+    // --- Hardcoded built-in commands ---
+
+    if (strcmp(argv[0], "echo") == 0) {
+        for (int i = 1; i < argc; i++) {
+            print_str(argv[i]);
+            if (i + 1 < argc) print_char(' ');
+        }
+        print_char('\n');
+        print_str(header);
+        return;
+    }
+
+    if (strcmp(argv[0], "clear") == 0) {
+        print_clear();
+        print_str(header);
+        return;
+    }
+
+    if (strcmp(argv[0], "info") == 0) {
+        print_str("AdiOS v1.0\n");
+        print_str(header);
+        return;
+    }
+
+    if (strcmp(argv[0], "shutdown") == 0) {
+        free_all();
+        print_str("System is shutting down...\n");
+        shutdown_system();
+        return;
+    }
+
+    if (strcmp(argv[0], "help") == 0) {
+        print_str("Built-in commands:\n");
+        print_str("  echo, clear, info, shutdown, help\n");
+        print_str("  mount [<drive> <path>]\n");
+        print_str("  umount <path>\n");
+        print_str("  src <file>\n");
+        print_str("Other commands are looked up in /bin on the mounted filesystem.\n");
+        print_str(header);
+        return;
+    }
+
+    // mount <drive_num> <mount_point>
+    // e.g.  mount 0 /
+    if (strcmp(argv[0], "mount") == 0) {
+        if (argc == 1) {
+            // No args: list current mounts
+            vfs_list_mounts();
+        } else if (argc == 3) {
+            int drv = argv[1][0] - '0';
+            if (drv < 0 || drv > 1) {
+                print_str("mount: drive must be 0 or 1\n");
+            } else {
+                if (vfs_mount(drv, argv[2]))
+                    print_str("mounted\n");
+            }
+        } else {
+            print_str("usage: mount [<drive> <path>]\n");
+        }
+        print_str(header);
+        return;
+    }
+
+    // umount <mount_point>
+    if (strcmp(argv[0], "umount") == 0) {
+        if (argc != 2) {
+            print_str("usage: umount <path>\n");
+        } else {
+            if (vfs_umount(argv[1]))
+                print_str("unmounted\n");
+        }
+        print_str(header);
+        return;
+    }
+
+    // src <file>  — execute each line of a file as a command (like bash source)
+    if (strcmp(argv[0], "src") == 0) {
+        if (argc != 2) {
+            print_str("usage: src <file>\n");
             print_str(header);
             return;
         }
+        char fat_path[VFS_MAX_PATH];
+        if (!vfs_resolve(argv[1], fat_path)) {
+            print_str("src: no filesystem mounted for ");
+            print_str(argv[1]);
+            print_char('\n');
+            print_str(header);
+            return;
+        }
+        FIL f;
+        FRESULT res = f_open(&f, fat_path, FA_READ);
+        if (res != FR_OK) {
+            print_str("src: cannot open ");
+            print_str(argv[1]);
+            print_char('\n');
+            print_str(header);
+            return;
+        }
+        static char src_line[INPUT_BUFFER_SIZE];
+        while (f_gets(src_line, sizeof(src_line), &f)) {
+            // Strip trailing newline/CR
+            size_t len = strlen(src_line);
+            while (len > 0 && (src_line[len-1] == '\n' || src_line[len-1] == '\r'))
+                src_line[--len] = '\0';
+            if (len == 0) continue;
+            print_str(src_line);
+            print_char('\n');
+            handle_command(src_line);
+        }
+        f_close(&f);
+        print_str(header);
+        return;
     }
 
-    print_str("\nUnknown command: ");
-    print_str(argv[0]);
-    print_char('\n');
+    // --- Look up command in /bin on the mounted filesystem ---
+    {
+        // Try to find /bin/<cmd> on any mounted filesystem
+        char bin_path[VFS_MAX_PATH];
+        // Build the logical path  /bin/<argv[0]>
+        char vfs_path[VFS_MAX_PATH];
+        strcpy(vfs_path, "/bin/");
+        size_t off = strlen(vfs_path);
+        size_t clen = strlen(argv[0]);
+        if (off + clen < VFS_MAX_PATH) {
+            memcpy(vfs_path + off, argv[0], clen + 1);
+        }
+
+        if (vfs_resolve(vfs_path, bin_path)) {
+            // File exists on disk — for now, report it as "not yet executable"
+            // (full ELF loading is a future step; this scaffolding is where it goes)
+            FIL probe;
+            if (f_open(&probe, bin_path, FA_READ) == FR_OK) {
+                f_close(&probe);
+                print_str(argv[0]);
+                print_str(": found in /bin but execution not yet supported\n");
+                print_str(header);
+                return;
+            }
+        }
+
+        print_str("command not found: ");
+        print_str(argv[0]);
+        print_char('\n');
+    }
     print_str(header);
 }
 
@@ -221,41 +340,11 @@ static void terminal_handle_input(struct KeyboardEvent event) {
     }
 }
 
-// Command implementations
-static void cmd_echo(int argc, char** argv) {
-    for (int i = 1; i < argc; i++) {
-        print_str(argv[i]);
-        if (i + 1 < argc) print_char(' ');
-    }
-    print_char('\n');
-}
-static void cmd_clear(int argc, char** argv) {
-    (void)argc; (void)argv;
-    print_clear();
-}
-static void cmd_info(int argc, char** argv) {
-    (void)argc; (void)argv;
-    print_str("AdiOS v1.0\n");
-}
-
-static void cmd_shutdown(int argc, char** argv) {
-    (void)argc; (void)argv;
-    free_all();
-    print_str("System is shutting down...\n");
-    shutdown_system();
-}
-
-static void cmd_help(int argc, char** argv) {
-    (void)argc; (void)argv;
-    print_str("Available commands:\n");
-    for (int i = 0; commands[i].name != NULL; i++) {
-        print_str("- ");
-        print_str(commands[i].name);
-        print_char('\n');
-    }
-}
-
 void terminal_init(void) {
+    // Bring up storage and filesystem layers
+    ata_init();
+    vfs_init();
+
     print_str("\nAdiOS Terminal\n");
     // Build prompt header
     strcpy(header, user);
