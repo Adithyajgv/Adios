@@ -7,6 +7,7 @@
 #include "stdlib.h"
 #include "power.h"
 #include "vfs.h"
+#include "x86_64/elf.h" // Include for ELF loading
 #include "x86_64/ata.h"
 
 // FatFs for src command file reading
@@ -197,7 +198,9 @@ static void handle_command(char* line) {
         print_str("  echo, clear, info, shutdown, help\n");
         print_str("  mount [<drive> <path>]\n");
         print_str("  umount <path>\n");
+        print_str("  ls [<path>]\n");
         print_str("  src <file>\n");
+        print_str("  rd <file>\n");
         print_str("Other commands are looked up in /bin on the mounted filesystem.\n");
         print_str(header);
         return;
@@ -276,6 +279,77 @@ static void handle_command(char* line) {
         return;
     }
 
+    // rd <file> - print file contents to the terminal
+    if (strcmp(argv[0], "rd") == 0) {
+        if (argc != 2) {
+            print_str("usage: rd <file>\n");
+            print_str(header);
+            return;
+        }
+        char fat_path[VFS_MAX_PATH];
+        if (!vfs_resolve(argv[1], fat_path)) {
+            print_str("rd: no filesystem mounted for ");
+            print_str(argv[1]);
+            print_char('\n');
+            print_str(header);
+            return;
+        }
+        FIL f;
+        FRESULT res = f_open(&f, fat_path, FA_READ);
+        if (res != FR_OK) {
+            print_str("rd: cannot open ");
+            print_str(argv[1]);
+            print_char('\n');
+            print_str(header);
+            return;
+        }
+        char buf[65];
+        UINT br;
+        while (f_read(&f, buf, sizeof(buf) - 1, &br) == FR_OK && br > 0) {
+            buf[br] = '\0';
+            print_str(buf);
+        }
+        print_char('\n');
+        f_close(&f);
+        print_str(header);
+        return;
+    }
+
+    // ls [<dir>] - list directory contents
+    if (strcmp(argv[0], "ls") == 0) {
+        const char* target = (argc > 1) ? argv[1] : "/";
+        char fat_path[VFS_MAX_PATH];
+        
+        if (!vfs_resolve(target, fat_path)) {
+            print_str("ls: no filesystem mounted for ");
+            print_str(target);
+            print_char('\n');
+            print_str(header);
+            return;
+        }
+        
+        DIR dir;
+        if (f_opendir(&dir, fat_path) == FR_OK) {
+            FILINFO fno;
+            while (f_readdir(&dir, &fno) == FR_OK && fno.fname[0] != 0) {
+                if (fno.fattrib & AM_DIR) {
+                    print_str("[DIR]  ");
+                } else {
+                    print_str("       ");
+                }
+                print_str(fno.fname);
+                print_char('\n');
+            }
+            f_closedir(&dir);
+        } else {
+            print_str("ls: cannot open directory ");
+            print_str(target);
+            print_char('\n');
+        }
+        print_str(header);
+        return;
+    }
+
     // --- Look up command in /bin on the mounted filesystem ---
     {
         // Try to find /bin/<cmd> on any mounted filesystem
@@ -294,10 +368,8 @@ static void handle_command(char* line) {
             // (full ELF loading is a future step; this scaffolding is where it goes)
             FIL probe;
             if (f_open(&probe, bin_path, FA_READ) == FR_OK) {
-                f_close(&probe);
-                print_str(argv[0]);
-                print_str(": found in /bin but execution not yet supported\n");
-                print_str(header);
+                f_close(&probe); // Close the probe file handle
+                elf_load_and_execute(bin_path); // Attempt to load and execute the ELF
                 return;
             }
         }

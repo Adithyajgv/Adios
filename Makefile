@@ -2,6 +2,7 @@ CROSS_PATH := $(HOME)/opt/cross/bin
 
 CC := $(CROSS_PATH)/x86_64-elf-gcc
 LD := $(CROSS_PATH)/x86_64-elf-ld
+CXX := $(CROSS_PATH)/x86_64-elf-g++
 AS := $(CROSS_PATH)/x86_64-elf-as
 OBJCOPY := $(CROSS_PATH)/x86_64-elf-objcopy
 
@@ -65,7 +66,7 @@ build-x86_64: $(kernel_object_files) $(x86_64_object_files) $(common_object_file
 #
 # Requires: dd, mkfs.fat (dosfstools), mmd, mcopy (mtools)
 .PHONY: rootfs
-rootfs:
+rootfs: user_apps
 	mkdir -p dist/x86_64
 	# Create a 32 MB blank image
 	dd if=/dev/zero of=dist/x86_64/rootfs.img bs=1M count=64 status=none
@@ -92,6 +93,46 @@ VM_NAME := AdiOS
 VBOX_STORAGECTL := IDE
 VBOX_PORT := 0
 VBOX_DEVICE := 1
+
+# --- User-space applications ---
+
+USER_APPS := $(patsubst user/%/,%,$(wildcard user/*/))
+USER_EXECS := $(patsubst %,rootfs_skel/bin/%,$(USER_APPS))
+
+USER_CFLAGS := -c -ffreestanding -nostdlib -I src/intf -I user/include
+USER_CXXFLAGS := -c -ffreestanding -nostdlib -fno-exceptions -fno-rtti -I src/intf -I user/include
+
+.PHONY: user_apps
+user_apps: $(USER_EXECS)
+
+define USER_APP_template
+# List of object files for this app
+$(1)_OBJS := $(patsubst user/$(1)/%.c,build/user/$(1)/%.o,$(wildcard user/$(1)/*.c)) \
+             $(patsubst user/$(1)/%.cpp,build/user/$(1)/%.o,$(wildcard user/$(1)/*.cpp))
+
+# Rule to link the application
+# We add build/stdio.o explicitly here so every app gets your print functions
+rootfs_skel/bin/$(1): $$($(1)_OBJS) build/stdio.o
+	@echo "LD (user) -> $$@"
+	mkdir -p $$(dir $$@)
+	$(LD) -n -o $$@ -T user/linker.ld $$^
+
+# App-specific C compilation rule
+build/user/$(1)/%.o: user/$(1)/%.c
+	@echo "CC (user) $$< -> $$@"
+	mkdir -p $$(dir $$@)
+	$(CC) $(USER_CFLAGS) $$< -o $$@
+
+# App-specific C++ compilation rule
+build/user/$(1)/%.o: user/$(1)/%.cpp
+	@echo "CXX (user) $$< -> $$@"
+	mkdir -p $$(dir $$@)
+	$(CXX) $(USER_CXXFLAGS) $$< -o $$@
+endef
+
+$(foreach app,$(USER_APPS),$(eval $(call USER_APP_template,$(app))))
+
+# --- End User-space applications ---
 
 .PHONY: clean
 clean:

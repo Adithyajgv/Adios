@@ -4,6 +4,8 @@
 #include "x86_64/idt.h"
 #include "x86_64/pic.h"
 
+extern void _sys_call_handler();
+
 #define IDT_IRQ0_TIMER 0x20
 #define IDT_IRQ1_KEYBOARD 0x21
 
@@ -15,6 +17,7 @@
 #define IDT_GATE_TYPE_INTERRUPT 0xE
 
 #define IDT_ENTRY_TYPE_INTERRUPT (IDT_GATE_PRESENT | IDT_GATE_DPL0 | IDT_GATE_TYPE_INTERRUPT)
+#define IDT_ENTRY_TYPE_SYSCALL (IDT_GATE_PRESENT | IDT_GATE_DPL3 | IDT_GATE_TYPE_INTERRUPT)
 
 struct IdtEntry {
 	uint16_t offset_low;
@@ -67,6 +70,7 @@ void idt_init() {
 	idt_ptr.base = (uint64_t) &idt;
 	
 	idt_set_entry(IDT_IRQ1_KEYBOARD, (uint64_t) idt_handler_keyboard_wrapped, GDT_SELECTOR_CS_KERNEL, IDT_ENTRY_TYPE_INTERRUPT);
+	idt_set_entry(0x80, (uint64_t)_sys_call_handler, GDT_SELECTOR_CS_KERNEL, IDT_ENTRY_TYPE_SYSCALL);
 	
 	idt_load(&idt_ptr);
 	

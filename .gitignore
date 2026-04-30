@@ -5,6 +5,7 @@
 /dist/
 /gcc/
 /binutils/
+/rootfs_skel/bin/*
 /.vscode/
 *.log
 *.tmp
