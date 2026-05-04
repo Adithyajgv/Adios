@@ -112,7 +112,7 @@ $(1)_OBJS := $(patsubst user/$(1)/%.c,build/user/$(1)/%.o,$(wildcard user/$(1)/*
 
 # Rule to link the application
 # We add build/stdio.o explicitly here so every app gets your print functions
-rootfs_skel/bin/$(1): $$($(1)_OBJS) build/stdio.o
+rootfs_skel/bin/$(1): $$($(1)_OBJS) build/stdio.o build/stdlib.o
 	@echo "LD (user) -> $$@"
 	mkdir -p $$(dir $$@)
 	$(LD) -n -o $$@ -T user/linker.ld $$^

@@ -2,28 +2,51 @@ extern syscall_handler
 global _sys_call_handler
 
 _sys_call_handler:
-    ; 1. Save state (so user app doesn't lose its variables)
-    push rdi
-    push rsi
-    push rdx
-    push rcx
+    ; SAVE ALL REGISTERS
     push rax
+    push rbx
+    push rcx
+    push rdx
+    push rsi
+    push rdi
+    push rbp
+    push r8
+    push r9
+    push r10
+    push r11
+    push r12
+    push r13
+    push r14
+    push r15
 
-    ; 2. SHUFFLE REGISTERS FOR C
-    ; User App gave us: ID in RAX, Char in RDI
-    ; C function wants: ID in RDI, Char in RSI
+    ; SHUFFLE REGISTERS FOR C ABI (4 Arguments)
     
-    mov rsi, rdi    ; Move Char (arg1) into RSI
-    mov rdi, rax    ; Move Syscall ID into RDI
+    mov rcx, rdx    ; Move Arg3 (Size) to 4th param
+    mov rdx, rsi    ; Move Arg2 (Buffer/Mode) to 3rd param
+    mov rsi, rdi    ; Move Arg1 (FD/Path) to 2nd param
+    mov rdi, rax    ; Move Syscall ID to 1st param
 
-    ; 3. Call the C logic
+    ; CALL THE C LOGIC
     call syscall_handler
 
-    ; 4. Restore state
-    pop rax
-    pop rcx
-    pop rdx
-    pop rsi
+    ; PRESERVE THE RETURN VALUE
+    mov [rsp + 112], rax
+
+    ; RESTORE ALL REGISTERS (Reverse Order)
+    pop r15
+    pop r14
+    pop r13
+    pop r12
+    pop r11
+    pop r10
+    pop r9
+    pop r8
+    pop rbp
     pop rdi
+    pop rsi
+    pop rdx
+    pop rcx
+    pop rbx
+    pop rax         
 
     iretq

@@ -12,14 +12,6 @@
  */
 
 typedef struct blockHeader {
-    /*
-     * size_status encodes size + two status bits:
-     *   Bit0 (a-bit): 0 = free, 1 = allocated
-     *   Bit1 (p-bit): 0 = previous block free, 1 = previous block allocated
-     * Size is always a multiple of 8, stored in the upper bits.
-     * Free blocks have a footer (also a blockHeader) storing size only.
-     * End mark: size_status == 1
-     */
     int size_status;
 } blockHeader;
 

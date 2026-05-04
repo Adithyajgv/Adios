@@ -14,6 +14,19 @@ __attribute__((weak)) void print_char(char c) {
     );
 }
 
+char getchar(void) {
+    uint64_t ret;
+    asm volatile (
+        "mov $8, %%rax\n"
+        "int $0x80\n"
+        "mov %%rax, %0\n"
+        : "=r"(ret)
+        :
+        : "rax", "memory"
+    );
+    return (char)ret;
+}
+
 void print_string(const char* str) {
     asm volatile (
         "mov $2, %%rax\n"   // Let's say Syscall ID 2 is print_str
@@ -56,4 +69,88 @@ void print_int(int num) {
     buffer[i] = '\n';
     buffer[i+1] = '\0';
     print_string(buffer);
+}
+
+int file_open(const char* path, int mode) {
+    int ret;
+    asm volatile (
+        "mov $3, %%rax\n"
+        "mov %1, %%rdi\n"
+        "mov %2, %%rsi\n"
+        "int $0x80\n"
+        "mov %%eax, %0\n"
+        : "=r"(ret)
+        : "r"(path), "r"((uint64_t)mode)
+        : "rax", "rdi", "rsi", "memory"
+    );
+    return ret;
+}
+
+int file_read(int fd, void* buf, uint64_t size) {
+    int ret;
+    asm volatile (
+        "mov $4, %%rax\n"
+        "mov %1, %%rdi\n"
+        "mov %2, %%rsi\n"
+        "mov %3, %%rdx\n"
+        "int $0x80\n"
+        "mov %%eax, %0\n"
+        : "=r"(ret)
+        : "r"((uint64_t)fd), "r"(buf), "r"(size)
+        : "rax", "rdi", "rsi", "rdx", "memory"
+    );
+    return ret;
+}
+
+int file_write(int fd, const void* buf, uint64_t size) {
+    int ret;
+    asm volatile (
+        "mov $5, %%rax\n"
+        "mov %1, %%rdi\n"
+        "mov %2, %%rsi\n"
+        "mov %3, %%rdx\n"
+        "int $0x80\n"
+        "mov %%eax, %0\n"
+        : "=r"(ret)
+        : "r"((uint64_t)fd), "r"(buf), "r"(size)
+        : "rax", "rdi", "rsi", "rdx", "memory"
+    );
+    return ret;
+}
+
+void file_close(int fd) {
+    asm volatile (
+        "mov $6, %%rax\n"
+        "mov %0, %%rdi\n"
+        "int $0x80\n"
+        : 
+        : "r"((uint64_t)fd)
+        : "rax", "rdi"
+    );
+}
+
+int file_create(const char* path) {
+    int ret;
+    asm volatile (
+        "mov $7, %%rax\n"
+        "mov %1, %%rdi\n"
+        "int $0x80\n"
+        "mov %%eax, %0\n"
+        : "=r"(ret)
+        : "r"(path)
+        : "rax", "rdi", "memory"
+    );
+    return ret;
+}
+
+char check_key(void) {
+    uint64_t ret;
+    asm volatile (
+        "mov $8, %%rax\n"
+        "int $0x80\n"
+        "mov %%rax, %0\n"
+        : "=r"(ret) 
+        : 
+        : "rax", "memory");
+    return (char)ret;
 }
